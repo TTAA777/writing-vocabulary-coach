@@ -31,21 +31,9 @@ Rules:
 - Ignore uppercase/lowercase differences.
 - Ignore small spacing differences.
 - If spelling is clearly wrong, mark incorrect.
-- If the answer is another valid word but not the target word, mark incorrect.
+- If the answer is another valid English word but not the target word, mark incorrect.
 - Be strict for vocabulary spelling practice.
-
-Return ONLY valid JSON.
-No markdown.
-No explanation outside JSON.
-
-JSON format:
-{
-  "isCorrect": true,
-  "score": 0,
-  "shortFeedbackJa": "string",
-  "correctAnswer": "string",
-  "userAnswer": "string"
-}
+- shortFeedbackJa must be simple Japanese.
 `;
 
     const response = await fetch("https://api.openai.com/v1/responses", {
@@ -57,7 +45,42 @@ JSON format:
       body: JSON.stringify({
         model: "gpt-4.1-mini",
         input: prompt,
-        temperature: 0.2
+        temperature: 0.2,
+        text: {
+          format: {
+            type: "json_schema",
+            name: "check_answer_result",
+            strict: true,
+            schema: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                isCorrect: {
+                  type: "boolean"
+                },
+                score: {
+                  type: "integer"
+                },
+                shortFeedbackJa: {
+                  type: "string"
+                },
+                correctAnswer: {
+                  type: "string"
+                },
+                userAnswer: {
+                  type: "string"
+                }
+              },
+              required: [
+                "isCorrect",
+                "score",
+                "shortFeedbackJa",
+                "correctAnswer",
+                "userAnswer"
+              ]
+            }
+          }
+        }
       })
     });
 
@@ -70,15 +93,21 @@ JSON format:
     }
 
     const data = await response.json();
-    const text = data.output_text;
+
+    const text =
+      data.output_text ||
+      data.output?.[0]?.content?.[0]?.text ||
+      "";
 
     let parsed;
+
     try {
       parsed = JSON.parse(text);
     } catch (e) {
       return res.status(500).json({
         error: "AI returned invalid JSON",
-        raw: text
+        raw: text,
+        fullResponse: data
       });
     }
 

@@ -378,6 +378,10 @@ struct PracticeView: View {
             "example": currentWord.example
         ]
 
+        print("AI CHECK START")
+        print("User answer:", trimmedAnswer)
+        print("Correct word:", currentWord.word)
+
         do {
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
@@ -385,6 +389,7 @@ struct PracticeView: View {
             request.httpBody = try JSONEncoder().encode(requestBody)
 
             let (data, response) = try await URLSession.shared.data(for: request)
+            print("AI RESPONSE RAW:", String(data: data, encoding: .utf8) ?? "No data")
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 isChecking = false
