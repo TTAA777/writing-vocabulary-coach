@@ -193,6 +193,7 @@ struct PracticeView: View {
                 VStack(spacing: 12) {
                     ZStack(alignment: .topLeading) {
                         PencilCanvasView(canvasView: $canvasView)
+                            .frame(minHeight: 300)
                             .clipShape(RoundedRectangle(cornerRadius: 24))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 24)
@@ -218,6 +219,7 @@ struct PracticeView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity)
     }
 
             private func handleResult(_ result: AnswerResult) {
@@ -233,7 +235,7 @@ struct PracticeView: View {
             }
 
     private var canvasButtons: some View {
-        HStack {
+        HStack(spacing: 10) {
             Button {
                 clearCanvas()
             } label: {
@@ -248,7 +250,7 @@ struct PracticeView: View {
             }
             .buttonStyle(.bordered)
 
-            Spacer()
+            Spacer(minLength: 8)
 
             Button {
                 checkAnswer()
@@ -262,6 +264,7 @@ struct PracticeView: View {
             .buttonStyle(.borderedProminent)
             .disabled(isChecking)
         }
+        .frame(maxWidth: .infinity)
     }
 
     private var typingBetaBox: some View {
