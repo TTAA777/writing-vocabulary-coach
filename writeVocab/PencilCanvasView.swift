@@ -3,6 +3,7 @@ import PencilKit
 
 struct PencilCanvasView: UIViewRepresentable {
     @Binding var canvasView: PKCanvasView
+    let isToolPickerVisible: Bool
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -13,23 +14,10 @@ struct PencilCanvasView: UIViewRepresentable {
         canvasView.backgroundColor = .clear
         canvasView.isOpaque = false
         canvasView.alwaysBounceVertical = false
-
         canvasView.tool = PKInkingTool(.pen, color: .black, width: 6)
 
         DispatchQueue.main.async {
-            canvasView.becomeFirstResponder()
-
-            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let window = windowScene.windows.first {
-                let toolPicker = PKToolPicker()
-                toolPicker.setVisible(true, forFirstResponder: canvasView)
-                toolPicker.addObserver(canvasView)
-                toolPicker.addObserver(context.coordinator)
-                canvasView.becomeFirstResponder()
-
-                context.coordinator.toolPicker = toolPicker
-                context.coordinator.window = window
-            }
+            updateToolPicker(for: canvasView, context: context)
         }
 
         return canvasView
@@ -37,12 +25,37 @@ struct PencilCanvasView: UIViewRepresentable {
 
     func updateUIView(_ uiView: PKCanvasView, context: Context) {
         DispatchQueue.main.async {
-            uiView.becomeFirstResponder()
-            context.coordinator.toolPicker?.setVisible(true, forFirstResponder: uiView)
+            updateToolPicker(for: uiView, context: context)
         }
     }
 
-    class Coordinator: NSObject, PKToolPickerObserver {
+    private func updateToolPicker(for uiView: PKCanvasView, context: Context) {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first else {
+            return
+        }
+
+        let toolPicker: PKToolPicker
+
+        if let existingToolPicker = context.coordinator.toolPicker {
+            toolPicker = existingToolPicker
+        } else {
+            toolPicker = PKToolPicker()
+            toolPicker.addObserver(uiView)
+            context.coordinator.toolPicker = toolPicker
+            context.coordinator.window = window
+        }
+
+        if isToolPickerVisible {
+            uiView.becomeFirstResponder()
+            toolPicker.setVisible(true, forFirstResponder: uiView)
+        } else {
+            toolPicker.setVisible(false, forFirstResponder: uiView)
+            uiView.resignFirstResponder()
+        }
+    }
+
+    class Coordinator: NSObject {
         var toolPicker: PKToolPicker?
         weak var window: UIWindow?
     }

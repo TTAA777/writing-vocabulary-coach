@@ -68,10 +68,10 @@ struct PracticeView: View {
                             if isLandscape {
                                 HStack(spacing: spacing) {
                                     meaningPanel
-                                        .frame(width: availableWidth * 0.34)
+                                        .frame(width: availableWidth * 0.30)
 
                                     rightPanel
-                                        .frame(width: availableWidth * 0.66)
+                                        .frame(width: availableWidth * 0.70)
                                 }
                                 .padding(padding)
                         } else {
@@ -192,7 +192,10 @@ struct PracticeView: View {
             } else {
                 VStack(spacing: 12) {
                     ZStack(alignment: .topLeading) {
-                        PencilCanvasView(canvasView: $canvasView)
+                        PencilCanvasView(
+                            canvasView: $canvasView,
+                            isToolPickerVisible: !typingMode
+                        )
                             .frame(minHeight: 360)
                             .clipShape(RoundedRectangle(cornerRadius: 24))
                             .overlay(
@@ -200,7 +203,9 @@ struct PracticeView: View {
                                     .stroke(Color.gray.opacity(0.25), lineWidth: 1)
                             )
 
-                        Text("Apple Pencil または指で英単語を書いてください")
+                        Text(typingMode
+                            ? "Typing Beta Mode中：下の入力欄に英単語を入力してください"
+                             : "Apple Pencil または指で英単語を書いてください")
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .padding(12)
@@ -268,10 +273,12 @@ struct PracticeView: View {
     }
 
     private var typingBetaBox: some View {
+
         VStack(alignment: .leading, spacing: 8) {
             Label("Beta testing only: type your answer here.", systemImage: "keyboard")
                 .font(.caption)
                 .foregroundColor(.orange)
+
 
             HStack {
                 TextField("英単語を入力", text: $typedAnswer)
@@ -292,6 +299,7 @@ struct PracticeView: View {
         .padding()
         .background(Color.orange.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .frame(maxWidth: .infinity)
     }
 
     private func feedbackView(_ result: AnswerResult) -> some View {
