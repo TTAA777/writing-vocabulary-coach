@@ -59,17 +59,33 @@ struct PracticeView: View {
                     header
 
                     GeometryReader { geometry in
-                        let totalSpacing: CGFloat = 20
-                        let availableWidth = geometry.size.width - totalSpacing
+                        let spacing: CGFloat = 16
+                        let padding: CGFloat = 16
+                        let availableWidth = geometry.size.width - spacing - padding * 2
+                        let isLandscape = geometry.size.width > geometry.size.height
 
-                        HStack(spacing: 20) {
-                            meaningPanel
-                                .frame(width: geometry.size.width * 0.32)
+                        ScrollView {
+                            if isLandscape {
+                                HStack(spacing: spacing) {
+                                    meaningPanel
+                                        .frame(width: availableWidth * 0.34)
 
-                            rightPanel
-                                .frame(width: geometry.size.width * 0.68)
+                                    rightPanel
+                                        .frame(width: availableWidth * 0.66)
+                                }
+                                .padding(padding)
+                        } else {
+                            VStack(spacing: spacing) {
+                                    meaningPanel
+                                        .frame(maxWidth: .infinity)
+
+                                    rightPanel
+                                        .frame(maxWidth: .infinity)
+                                        .frame(minHeight: 420)
+                                }
+                                .padding(padding)
+                            }
                         }
-                        .padding()
                     }
                 }
             }
