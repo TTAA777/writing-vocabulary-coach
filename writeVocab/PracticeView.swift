@@ -20,6 +20,7 @@ struct PracticeView: View {
 
     @State private var feedback: AnswerResult? = nil
     @State private var showHint: Bool = false
+    @State private var isChecking: Bool = false
 
     @State private var canvasView = PKCanvasView()
 
@@ -236,9 +237,14 @@ struct PracticeView: View {
             Button {
                 checkAnswer()
             } label: {
-                Label("Check", systemImage: "checkmark.circle.fill")
+                if isChecking {
+                    ProgressView()
+                } else {
+                    Label("Check", systemImage: "checkmark.circle.fill")
+                }
             }
             .buttonStyle(.borderedProminent)
+            .disabled(isChecking)
         }
     }
 
@@ -261,7 +267,7 @@ struct PracticeView: View {
                     checkAnswer()
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isChecking)
             }
         }
         .padding()
@@ -316,14 +322,85 @@ struct PracticeView: View {
 
     private func checkAnswer() {
         if typingMode {
-            let result = AnswerChecker.check(
-                userAnswer: typedAnswer,
-                correctAnswer: currentWord.word
+            Task {
+                await checkAnswerWithAI()
+            }
+        } else {
+            recognizeHandwritingAndCheck()
+        }
+    }
+
+    private func checkAnswerWithAI() async {
+        let trimmedAnswer = typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmedAnswer.isEmpty else {
+            return
+        }
+
+        isChecking = true
+
+        guard let url = URL(string: "https://writing-vocabulary-coach.vercel.app/api/check-answer") else {
+            isChecking = false
+            return
+        }
+
+        let requestBody: [String: String] = [
+            "userAnswer": trimmedAnswer,
+            "correctWord": currentWord.word,
+            "meaningJa": currentWord.meaningJa,
+            "example": currentWord.example
+        ]
+
+        do {
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONEncoder().encode(requestBody)
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                isChecking = false
+                return
+            }
+
+            guard httpResponse.statusCode == 200 else {
+                isChecking = false
+
+                let result = AnswerResult(
+                    isCorrect: false,
+                    userAnswer: trimmedAnswer,
+                    correctAnswer: currentWord.word,
+                    message: "AI採点でエラーが出ました。ステータス: \(httpResponse.statusCode)"
+                )
+
+                handleResult(result)
+                return
+            }
+
+            let aiResult = try JSONDecoder().decode(AICheckAnswerResponse.self, from: data)
+
+            let result = AnswerResult(
+                isCorrect: aiResult.isCorrect,
+                userAnswer: aiResult.userAnswer,
+                correctAnswer: aiResult.correctAnswer,
+                message: aiResult.shortFeedbackJa
+            )
+
+            isChecking = false
+            handleResult(result)
+
+        } catch {
+            isChecking = false
+
+            let result = AnswerResult(
+                isCorrect: false,
+                userAnswer: trimmedAnswer,
+                correctAnswer: currentWord.word,
+                message: "AI採点に接続できませんでした: \(error.localizedDescription)"
             )
 
             handleResult(result)
-        } else {
-            recognizeHandwritingAndCheck()
         }
     }
 
@@ -401,4 +478,12 @@ struct PracticeView: View {
             UserDefaults.standard.set(data, forKey: "mistakes_v2")
         }
     }
+}
+
+struct AICheckAnswerResponse: Codable {
+    let isCorrect: Bool
+    let score: Int
+    let shortFeedbackJa: String
+    let correctAnswer: String
+    let userAnswer: String
 }
