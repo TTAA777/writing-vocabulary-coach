@@ -4,13 +4,49 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { correctAnswer, userAnswer, meaningJa } = req.body;
+    const {
+      userAnswer,
+      correctWord,
+      meaningJa = "",
+      example = ""
+    } = req.body || {};
 
-    if (!correctAnswer || !userAnswer) {
+    if (!userAnswer || !correctWord) {
       return res.status(400).json({
-        error: "correctAnswer and userAnswer are required"
+        error: "Missing userAnswer or correctWord"
       });
     }
+
+    const prompt = `
+You are checking an English vocabulary answer.
+
+Correct word: ${correctWord}
+Japanese meaning: ${meaningJa}
+Example sentence: ${example}
+User answer: ${userAnswer}
+
+Judge if the user's answer is correct.
+
+Rules:
+- Ignore uppercase/lowercase differences.
+- Ignore small spacing differences.
+- If spelling is clearly wrong, mark incorrect.
+- If the answer is another valid word but not the target word, mark incorrect.
+- Be strict for vocabulary spelling practice.
+
+Return ONLY valid JSON.
+No markdown.
+No explanation outside JSON.
+
+JSON format:
+{
+  "isCorrect": true,
+  "score": 0,
+  "shortFeedbackJa": "string",
+  "correctAnswer": "string",
+  "userAnswer": "string"
+}
+`;
 
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
@@ -19,55 +55,31 @@ export default async function handler(req, res) {
         "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: "gpt-5.4-mini",
-        input: [
-          {
-            role: "system",
-            content:
-              "You are an English vocabulary answer checker. Return only valid JSON."
-          },
-          {
-            role: "user",
-            content: `
-Correct answer: ${correctAnswer}
-Japanese meaning: ${meaningJa || ""}
-User answer: ${userAnswer}
-
-Judge if the user's answer is correct.
-Be lenient for small capitalization mistakes.
-Return JSON with:
-{
-  "isCorrect": true or false,
-  "score": 0-100,
-  "correctAnswer": "...",
-  "userAnswer": "...",
-  "shortFeedbackJa": "..."
-}
-`
-          }
-        ]
+        model: "gpt-4.1-mini",
+        input: prompt,
+        temperature: 0.2
       })
     });
 
-    const data = await response.json();
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({
+        error: "OpenAI API error",
+        detail: errorText
+      });
+    }
 
-    const text =
-      data.output_text ||
-      data.output?.[0]?.content?.[0]?.text ||
-      "";
+    const data = await response.json();
+    const text = data.output_text;
 
     let parsed;
-
     try {
       parsed = JSON.parse(text);
-    } catch {
-      parsed = {
-        isCorrect: false,
-        score: 0,
-        correctAnswer,
-        userAnswer,
-        shortFeedbackJa: "AIの返答を読み取れませんでした。"
-      };
+    } catch (e) {
+      return res.status(500).json({
+        error: "AI returned invalid JSON",
+        raw: text
+      });
     }
 
     return res.status(200).json(parsed);
