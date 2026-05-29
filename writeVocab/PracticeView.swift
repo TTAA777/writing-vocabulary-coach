@@ -334,6 +334,14 @@ struct PracticeView: View {
         let trimmedAnswer = typedAnswer.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !trimmedAnswer.isEmpty else {
+            feedback = AnswerResult(
+                isCorrect: false,
+                userAnswer: "",
+                correctAnswer: currentWord.word,
+                message: typingMode
+                    ? "Typing Beta Modeでは、下の入力欄に英単語を入力してから確認してください。"
+                    : "手書き認識はまだ接続されていません。"
+            )
             return
         }
 
