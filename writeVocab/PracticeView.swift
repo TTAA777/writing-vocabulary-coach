@@ -193,7 +193,7 @@ struct PracticeView: View {
                 VStack(spacing: 12) {
                     ZStack(alignment: .topLeading) {
                         PencilCanvasView(canvasView: $canvasView)
-                            .frame(minHeight: 300)
+                            .frame(minHeight: 360)
                             .clipShape(RoundedRectangle(cornerRadius: 24))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 24)
