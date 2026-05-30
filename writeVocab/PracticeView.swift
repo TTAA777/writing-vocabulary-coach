@@ -21,6 +21,8 @@ struct PracticeView: View {
     @State private var feedback: AnswerResult? = nil
     @State private var showHint: Bool = false
     @State private var isChecking: Bool = false
+    @State private var explanation: AIExplainAnswerResponse? = nil
+    @State private var isLoadingExplanation: Bool = false
 
     @State private var canvasView = PKCanvasView()
 
@@ -325,13 +327,60 @@ struct PracticeView: View {
                     .multilineTextAlignment(.center)
             }
 
-            if !result.isCorrect {
-                Button {
-                    goNext()
-                } label: {
-                    Label("次の問題へ", systemImage: "arrow.right")
-                }
-                .buttonStyle(.borderedProminent)
+           if !result.isCorrect {
+                VStack(spacing: 12) {
+                    if isLoadingExplanation {
+                        ProgressView("AI解説を作成中...")
+                    } else if let explanation = explanation {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("AI解説")
+                                .font(.headline)
+
+                            Text(explanation.explanationJa)
+                                .font(.body)
+
+                            Divider()
+
+                            Text("覚え方")
+                                .font(.headline)
+
+                            Text(explanation.memoryTipJa)
+                                .font(.body)
+
+                            Divider()
+
+                            Text("ミニ練習")
+                                .font(.headline)
+
+                            Text(explanation.miniPracticeJa)
+                                .font(.body)
+
+                            Text("答え: \(explanation.miniPracticeAnswer)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.white.opacity(0.7))
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                    } else {
+                        Button {
+                            Task {
+                                await fetchExplanation(for: result)
+                            }
+                        } label: {
+                            Label("AI解説を見る", systemImage: "sparkles")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+
+                    Button {
+                        goNext()
+                    } label: {
+                        Label("次の問題へ", systemImage: "arrow.right")
+                    }
+                    .buttonStyle(.borderedProminent)
+                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -444,6 +493,53 @@ struct PracticeView: View {
         }
     }
 
+    private func fetchExplanation(for result: AnswerResult) async {
+        isLoadingExplanation = true
+        explanation = nil
+
+        guard let url = URL(string: "https://writing-vocabulary-coach.vercel.app/api/explain-answer") else {
+            isLoadingExplanation = false
+            return
+        }
+
+        let requestBody: [String: String] = [
+            "userAnswer": result.userAnswer,
+            "correctWord": currentWord.word,
+            "meaningJa": currentWord.meaningJa,
+            "example": currentWord.example
+        ]
+
+        do {
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONEncoder().encode(requestBody)
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                isLoadingExplanation = false
+                return
+            }
+
+            guard httpResponse.statusCode == 200 else {
+                isLoadingExplanation = false
+                print("AI explanation error status:", httpResponse.statusCode)
+                print(String(data: data, encoding: .utf8) ?? "No data")
+                return
+            }
+
+            let decoded = try JSONDecoder().decode(AIExplainAnswerResponse.self, from: data)
+
+            explanation = decoded
+            isLoadingExplanation = false
+
+        } catch {
+                isLoadingExplanation = false
+                print("AI explanation connection error:", error.localizedDescription)
+            }
+    }
+
     private func recognizeHandwritingAndCheck() {
         guard let image = canvasImage(),
             let imageData = image.pngData() else {
@@ -467,6 +563,8 @@ struct PracticeView: View {
 
     private func goNext() {
         feedback = nil
+        explanation = nil
+        isLoadingExplanation = false
         typedAnswer = ""
         showHint = false
         clearCanvas()
@@ -525,5 +623,12 @@ struct AICheckAnswerResponse: Codable {
     let score: Int
     let shortFeedbackJa: String
     let correctAnswer: String
-    let userAnswer: String
+    let userAnswer: String    
+}
+
+struct AIExplainAnswerResponse: Codable {
+    let explanationJa: String
+    let memoryTipJa: String
+    let miniPracticeJa: String
+    let miniPracticeAnswer: String
 }
